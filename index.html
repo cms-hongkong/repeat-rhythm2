@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>修復音符橋樑</title>
+    <title>修復音符橋樑 (進階版)</title>
     <style>
         body {
             font-family: "Microsoft JhengHei", Arial, sans-serif;
@@ -25,6 +25,9 @@
         p.instruction {
             font-size: 1.2rem;
             margin-bottom: 20px;
+            background-color: rgba(0,0,0,0.2);
+            padding: 10px 20px;
+            border-radius: 10px;
         }
 
         #progress-board {
@@ -40,7 +43,7 @@
 
         #game-container {
             width: 100%;
-            max-width: 900px;
+            max-width: 1000px; /* 稍微加寬以容納4段橋 */
             position: relative;
         }
 
@@ -53,8 +56,8 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            gap: 20px; /* 三段橋樑的間距 */
-            border-bottom: 8px solid #7f8c8d; /* 橋面基底 */
+            gap: 15px; 
+            border-bottom: 8px solid #7f8c8d; 
             margin-bottom: 30px;
             flex-wrap: wrap; /* 螢幕太小時自動換行 */
         }
@@ -64,9 +67,9 @@
             background-color: rgba(255, 255, 255, 0.1);
             border: 2px solid #bdc3c7;
             border-radius: 10px;
-            padding: 15px;
+            padding: 10px;
             display: flex;
-            gap: 10px;
+            gap: 8px;
             box-shadow: 0px 4px 10px rgba(0,0,0,0.3);
         }
 
@@ -74,24 +77,42 @@
         .note {
             background-color: white;
             color: #2c3e50;
-            font-size: 2.5rem;
-            width: 60px;
-            height: 80px;
+            font-size: 2.2rem;
+            width: 50px; /* 稍微縮小一點點以放得下4段 */
+            height: 70px;
             display: flex;
             justify-content: center;
             align-items: center;
             border-radius: 8px;
             box-shadow: 0px 4px 0px #bdc3c7;
             user-select: none;
+            transition: all 0.3s;
         }
 
-        /* 缺口的音符 */
-        .missing-note {
-            background-color: #34495e;
-            color: #f1c40f;
-            border: 3px dashed #f1c40f;
+        /* 正在等待修復的缺口 (安靜狀態) */
+        .waiting-hole {
+            background-color: #2c3e50;
+            color: #7f8c8d;
+            border: 3px dashed #7f8c8d;
             box-shadow: none;
             box-sizing: border-box;
+            opacity: 0.7;
+        }
+
+        /* 現在要修復的缺口 (閃爍狀態) */
+        .active-hole {
+            background-color: #34495e;
+            color: #f1c40f;
+            border: 4px dashed #f1c40f;
+            box-shadow: 0 0 15px rgba(241, 196, 15, 0.6);
+            box-sizing: border-box;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); border-color: #f1c40f; }
+            50% { transform: scale(1.1); border-color: #f39c12; }
+            100% { transform: scale(1); border-color: #f1c40f; }
         }
 
         /* 選項按鈕區域 */
@@ -140,10 +161,10 @@
         .correct-fill {
             background-color: #2ecc71 !important;
             color: white !important;
-            border: 3px solid #27ae60 !important;
+            border: none !important;
             box-shadow: 0px 4px 0px #27ae60 !important;
             transform: scale(1.1);
-            transition: all 0.3s;
+            animation: none; /* 關閉閃爍 */
         }
 
         #message {
@@ -194,13 +215,12 @@
 <body>
 
     <h1>🌉 修復音符橋樑</h1>
-    <p class="instruction">工程師請注意！這座橋有著重複的音符圖案，但中間破了一個洞「？」。<br>請觀察前後的規律，點擊下方正確的材料來修補它！</p>
+    <p class="instruction">這座橋現在有 <strong>2 個破洞</strong>！<br>請觀察規律，點擊下方材料，先幫忙修好<strong>「正在閃爍」</strong>的那一個洞吧！</p>
 
     <div id="progress-board">目前進度：<span id="current-q">1</span> / 10</div>
 
     <div id="game-container">
-        <div id="bridge-area">
-            </div>
+        <div id="bridge-area"></div>
 
         <div id="options-area">
             <button class="option-btn" onclick="checkAnswer('♩')">♩</button>
@@ -209,8 +229,8 @@
         </div>
 
         <div id="end-screen">
-            <h2>🌟 橋樑修復完畢 🌟</h2>
-            <p style="font-size: 1.5rem; margin-bottom: 30px;">你成功補好了 10 個漏洞，是個出色的節奏工程師！</p>
+            <h2>🌟 橋樑全面修復 🌟</h2>
+            <p style="font-size: 1.5rem; margin-bottom: 30px;">你成功補好了所有的漏洞，是個頂級的節奏工程師！</p>
             <button class="restart-btn" onclick="startGame()">再玩一次</button>
         </div>
     </div>
@@ -218,7 +238,6 @@
     <div id="message"></div>
 
     <script>
-        // 題庫：定義不同的節奏頻現句結構 (陣列形式方便挖空)
         const patterns = [
             ["♩", "♫", "♩", "𝄽"],
             ["♫", "♫", "♩", "♩"],
@@ -232,8 +251,10 @@
         const MAX_QUESTIONS = 10;
         let currentQuestion = 1;
         let isClickable = true;
-        let currentMissingNote = ""; // 記錄當前題目正確的音符答案
-        let missingElementRef = null; // 記錄畫面上那個缺口的 HTML 元素
+        
+        // 用來儲存當前題目中，需要修復的洞
+        let holesToFill = []; 
+        let currentHoleIndex = 0; // 目前正在修復第幾個洞
 
         const bridgeArea = document.getElementById('bridge-area');
         const endScreen = document.getElementById('end-screen');
@@ -252,29 +273,43 @@
             isClickable = true;
             messageDisplay.textContent = "";
             bridgeArea.innerHTML = ""; 
+            holesToFill = [];
+            currentHoleIndex = 0;
 
             // 1. 隨機選一個頻現句結構
             const pattern = patterns[Math.floor(Math.random() * patterns.length)];
             
-            // 2. 決定要把哪一個位置挖空 (0 到 3)
-            const missingIndex = Math.floor(Math.random() * 4);
-            currentMissingNote = pattern[missingIndex]; // 記下正確答案
+            // 2. 決定要在哪 2 個橋樑段落挖洞 (隨機從 0, 1, 2, 3 中選兩個不重複的數字)
+            let segmentsWithHoles = [];
+            while(segmentsWithHoles.length < 2) {
+                let r = Math.floor(Math.random() * 4);
+                if(!segmentsWithHoles.includes(r)) {
+                    segmentsWithHoles.push(r);
+                }
+            }
+            segmentsWithHoles.sort(); // 讓破洞由左至右出現
 
-            // 3. 建立三段橋樑 (前後完整，中間破洞)
-            for (let segmentNum = 1; segmentNum <= 3; segmentNum++) {
+            // 3. 建立 4 段橋樑
+            for (let segmentNum = 0; segmentNum < 4; segmentNum++) {
                 const segmentDiv = document.createElement('div');
                 segmentDiv.classList.add('bridge-segment');
+
+                // 檢查這一段橋樑是否需要被挖洞
+                let isHoleSegment = segmentsWithHoles.includes(segmentNum);
+                let holeIndexInSegment = isHoleSegment ? Math.floor(Math.random() * 4) : -1;
 
                 for (let i = 0; i < 4; i++) {
                     const noteDiv = document.createElement('div');
                     noteDiv.classList.add('note');
 
-                    // 如果是第二段橋，且剛好是挖空的位置
-                    if (segmentNum === 2 && i === missingIndex) {
-                        noteDiv.classList.add('missing-note');
+                    // 如果剛好是挖空的位置
+                    if (i === holeIndexInSegment) {
                         noteDiv.textContent = "?";
-                        noteDiv.id = "target-hole"; // 給它一個 ID 方便等一下修改
-                        missingElementRef = noteDiv;
+                        // 把這個破洞的 HTML 元素和它的正確答案存起來
+                        holesToFill.push({
+                            element: noteDiv,
+                            answer: pattern[i]
+                        });
                     } else {
                         noteDiv.textContent = pattern[i];
                     }
@@ -282,42 +317,63 @@
                 }
                 bridgeArea.appendChild(segmentDiv);
             }
+
+            // 4. 更新破洞的視覺狀態 (讓第一個洞閃爍)
+            updateHoleFocus();
+        }
+
+        // 更新破洞的焦點，讓學生知道現在要修哪一個
+        function updateHoleFocus() {
+            holesToFill.forEach((holeObj, index) => {
+                if (index === currentHoleIndex) {
+                    // 現在要修的洞：閃爍黃色
+                    holeObj.element.className = 'note active-hole';
+                } else if (index > currentHoleIndex) {
+                    // 還沒輪到的洞：暗色虛線
+                    holeObj.element.className = 'note waiting-hole';
+                }
+            });
         }
 
         // 檢查玩家點擊的按鈕
         function checkAnswer(selectedNote) {
             if (!isClickable) return;
 
-            if (selectedNote === currentMissingNote) {
-                // 答對了
-                isClickable = false;
-                
-                // 把問號變成正確的音符，並加入特效
-                missingElementRef.textContent = selectedNote;
-                missingElementRef.classList.remove('missing-note');
-                missingElementRef.classList.add('correct-fill');
+            let activeHole = holesToFill[currentHoleIndex];
 
-                messageDisplay.style.color = "#2ecc71";
-                messageDisplay.textContent = "🎉 修補成功！";
+            if (selectedNote === activeHole.answer) {
+                // 答對了 (修好一個洞)
+                activeHole.element.textContent = selectedNote;
+                activeHole.element.className = 'note correct-fill';
 
-                setTimeout(() => {
-                    if (currentQuestion >= MAX_QUESTIONS) {
-                        showEndScreen();
-                    } else {
-                        currentQuestion++;
-                        progressDisplay.textContent = currentQuestion;
-                        initRound();
-                    }
-                }, 1200); 
+                currentHoleIndex++; // 前進到下一個洞
+
+                // 檢查是不是所有的洞都修好了
+                if (currentHoleIndex >= holesToFill.length) {
+                    isClickable = false;
+                    messageDisplay.style.color = "#2ecc71";
+                    messageDisplay.textContent = "🎉 兩個洞都修補成功！";
+
+                    setTimeout(() => {
+                        if (currentQuestion >= MAX_QUESTIONS) {
+                            showEndScreen();
+                        } else {
+                            currentQuestion++;
+                            progressDisplay.textContent = currentQuestion;
+                            initRound();
+                        }
+                    }, 1200); 
+                } else {
+                    // 還有洞沒修完，把焦點移到下一個洞
+                    updateHoleFocus();
+                }
 
             } else {
                 // 答錯了
                 isClickable = false;
-                
-                // 整個橋樑震動提示錯誤
                 bridgeArea.classList.add('shake');
                 messageDisplay.style.color = "#e74c3c";
-                messageDisplay.textContent = "❌ 不對喔，再觀察一下前後的規律！";
+                messageDisplay.textContent = "❌ 材料不對喔，再觀察一下！";
 
                 setTimeout(() => {
                     bridgeArea.classList.remove('shake');
